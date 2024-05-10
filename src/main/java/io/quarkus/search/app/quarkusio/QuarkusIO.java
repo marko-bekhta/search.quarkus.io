@@ -28,6 +28,7 @@ import io.quarkus.search.app.entity.Guide;
 import io.quarkus.search.app.entity.I18nData;
 import io.quarkus.search.app.entity.Language;
 import io.quarkus.search.app.indexing.FailureCollector;
+import io.quarkus.search.app.indexing.IndexableGuides;
 import io.quarkus.search.app.util.CloseableDirectory;
 import io.quarkus.search.app.util.GitCloneDirectory;
 import io.quarkus.search.app.util.GitInputProvider;
@@ -44,7 +45,7 @@ import org.fedorahosted.tennera.jgettext.Message;
 import org.fedorahosted.tennera.jgettext.PoParser;
 import org.yaml.snakeyaml.Yaml;
 
-public class QuarkusIO implements Closeable {
+public class QuarkusIO implements IndexableGuides, Closeable {
 
     public static final String QUARKUS_ORIGIN = "quarkus";
     private static final String QUARKIVERSE_ORIGIN = "quarkiverse";
