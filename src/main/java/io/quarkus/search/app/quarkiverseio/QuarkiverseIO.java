@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -71,14 +72,15 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
 
         for (Element quarkiverseGuideIndexLink : quarkiverseGuideIndexLinks) {
             Guide guide = new Guide();
-            guide.title.set(Language.ENGLISH, quarkiverseGuideIndexLink.text());
+            String topLevelTitle = quarkiverseGuideIndexLink.text();
+            guide.title.set(Language.ENGLISH, topLevelTitle );
 
             Document extensionIndex = null;
             try {
-                extensionIndex = readGuide(guide, quarkiverseGuideIndexLink.absUrl("href"));
+                extensionIndex = readGuide(guide, quarkiverseGuideIndexLink.absUrl("href"), Optional.empty());
             } catch (URISyntaxException | IOException e) {
                 failureCollector.warning(FailureCollector.Stage.PARSING,
-                        "Unable to fetch guide: " + quarkiverseGuideIndexLink.text(), e);
+                        "Unable to fetch guide: " + topLevelTitle, e);
                 continue;
             }
 
@@ -97,10 +99,10 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
                 Guide sub = new Guide();
                 sub.title.set(Language.ENGLISH, entry.getValue());
                 try {
-                    readGuide(sub, entry.getKey().toString());
+                    readGuide( sub, entry.getKey().toString(), Optional.of( topLevelTitle ) );
                 } catch (URISyntaxException | IOException e) {
                     failureCollector.warning(FailureCollector.Stage.PARSING,
-                            "Unable to fetch guide: " + quarkiverseGuideIndexLink.text(), e);
+                            "Unable to fetch guide: " + topLevelTitle, e);
                     continue;
                 }
                 quarkiverseGuides.add(sub);
@@ -108,7 +110,7 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
         }
     }
 
-    private Document readGuide(Guide guide, String link) throws URISyntaxException, IOException {
+    private Document readGuide(Guide guide, String link, Optional<String> titlePrefix) throws URISyntaxException, IOException {
         guide.url = new URI(link);
         guide.type = "reference";
         guide.origin = QUARKIVERSE_ORIGIN;
@@ -118,12 +120,13 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
 
         String title = content.select("h1.page").text();
         if (!title.isBlank()) {
-            guide.title.set(Language.ENGLISH, title);
+            String actualTitle = titlePrefix.map( prefix -> "%s: %s".formatted( prefix, title ) ).orElse( title );
+            guide.title.set(Language.ENGLISH, actualTitle);
         }
         guide.summary.set(Language.ENGLISH, content.select("div#preamble").text());
         guide.htmlFullContentProvider.set(Language.ENGLISH, new FileInputProvider(link, dumpHtmlToFile(content.html())));
 
-        Log.debug("Parsed guide: " + guide.url);
+        Log.debugf( "Parsed guide: %s", guide.url );
         return extensionIndex;
     }
 
