@@ -1,16 +1,19 @@
 package io.quarkus.search.app.quarkiverseio;
 
-import java.io.ByteArrayInputStream;
 import java.io.Closeable;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import jakarta.ws.rs.core.UriBuilder;
@@ -20,8 +23,11 @@ import io.quarkus.search.app.entity.Language;
 import io.quarkus.search.app.hibernate.InputProvider;
 import io.quarkus.search.app.indexing.FailureCollector;
 import io.quarkus.search.app.indexing.IndexableGuides;
+import io.quarkus.search.app.util.CloseableDirectory;
 
 import io.quarkus.logging.Log;
+
+import org.hibernate.search.util.common.impl.Closer;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -37,11 +43,17 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
 
     private final List<Guide> quarkiverseGuides = new ArrayList<>();
     private final boolean enabled;
+    private final CloseableDirectory guideHtmls;
 
     public QuarkiverseIO(QuarkiverseIOConfig config, FailureCollector failureCollector) {
-        quarkiverseDocsIndex = config.webUri();
-        enabled = config.enabled();
+        this.quarkiverseDocsIndex = config.webUri();
+        this.enabled = config.enabled();
         this.failureCollector = failureCollector;
+        try {
+            guideHtmls = CloseableDirectory.temp("quarkiverse_htmls_");
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to fetch quarkiverse guides: %s".formatted(e.getMessage()), e);
+        }
     }
 
     public void parseGuides() {
@@ -109,11 +121,18 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
             guide.title.set(Language.ENGLISH, title);
         }
         guide.summary.set(Language.ENGLISH, content.select("div#preamble").text());
-        // TODO: dump content.html() to a file? so that we don't keep all HTMLs in-memory...
-        guide.htmlFullContentProvider.set(Language.ENGLISH, new StringInputProvider(link, content.html()));
+        guide.htmlFullContentProvider.set(Language.ENGLISH, new FileInputProvider(link, dumpHtmlToFile(content.html())));
 
         Log.debug("Parsed guide: " + guide.url);
         return extensionIndex;
+    }
+
+    private Path dumpHtmlToFile(String html) throws IOException {
+        Path path = guideHtmls.path().resolve(UUID.randomUUID().toString());
+        try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
+            fos.write(html.getBytes(StandardCharsets.UTF_8));
+        }
+        return path;
     }
 
     public Stream<Guide> guides() {
@@ -124,22 +143,18 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
     }
 
     @Override
-    public void close() {
-        quarkiverseGuides.clear();
+    public void close() throws IOException {
+        try (var closer = new Closer<IOException>()) {
+            closer.push(CloseableDirectory::close, guideHtmls);
+            closer.push(List::clear, quarkiverseGuides);
+        }
     }
 
-    private record StringInputProvider(String link, String content) implements InputProvider {
+    private record FileInputProvider(String link, Path content) implements InputProvider {
 
         @Override
         public InputStream open() throws IOException {
-            return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-        }
-
-        @Override
-        public String toString() {
-            return "StringInputProvider{" +
-                    "link='" + link + '\'' +
-                    '}';
+            return new FileInputStream(content.toFile());
         }
     }
 }

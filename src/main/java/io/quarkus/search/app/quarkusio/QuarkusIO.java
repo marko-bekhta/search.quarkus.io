@@ -47,7 +47,6 @@ import org.yaml.snakeyaml.Yaml;
 public class QuarkusIO implements IndexableGuides, Closeable {
 
     public static final String QUARKUS_ORIGIN = "quarkus";
-    private static final String QUARKIVERSE_ORIGIN = "quarkiverse";
     public static final GitCloneDirectory.Branches MAIN_BRANCHES = new GitCloneDirectory.Branches(
             "develop", "master");
     public static final GitCloneDirectory.Branches LOCALIZED_BRANCHES = new GitCloneDirectory.Branches(
