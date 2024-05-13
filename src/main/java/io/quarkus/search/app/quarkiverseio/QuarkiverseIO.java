@@ -20,7 +20,6 @@ import java.util.stream.Stream;
 import jakarta.ws.rs.core.UriBuilder;
 
 import io.quarkus.search.app.entity.Guide;
-import io.quarkus.search.app.entity.Language;
 import io.quarkus.search.app.hibernate.InputProvider;
 import io.quarkus.search.app.indexing.FailureCollector;
 import io.quarkus.search.app.indexing.IndexableGuides;
@@ -73,7 +72,7 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
         for (Element quarkiverseGuideIndexLink : quarkiverseGuideIndexLinks) {
             Guide guide = new Guide();
             String topLevelTitle = quarkiverseGuideIndexLink.text();
-            guide.title.set(Language.ENGLISH, topLevelTitle );
+            guide.title.set(topLevelTitle);
 
             Document extensionIndex = null;
             try {
@@ -97,9 +96,9 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
 
             for (Map.Entry<URI, String> entry : indexLinks.entrySet()) {
                 Guide sub = new Guide();
-                sub.title.set(Language.ENGLISH, entry.getValue());
+                sub.title.set(entry.getValue());
                 try {
-                    readGuide( sub, entry.getKey().toString(), Optional.of( topLevelTitle ) );
+                    readGuide(sub, entry.getKey().toString(), Optional.of(topLevelTitle));
                 } catch (URISyntaxException | IOException e) {
                     failureCollector.warning(FailureCollector.Stage.PARSING,
                             "Unable to fetch guide: " + topLevelTitle, e);
@@ -120,13 +119,13 @@ public class QuarkiverseIO implements IndexableGuides, Closeable {
 
         String title = content.select("h1.page").text();
         if (!title.isBlank()) {
-            String actualTitle = titlePrefix.map( prefix -> "%s: %s".formatted( prefix, title ) ).orElse( title );
-            guide.title.set(Language.ENGLISH, actualTitle);
+            String actualTitle = titlePrefix.map(prefix -> "%s: %s".formatted(prefix, title)).orElse(title);
+            guide.title.set(actualTitle);
         }
-        guide.summary.set(Language.ENGLISH, content.select("div#preamble").text());
-        guide.htmlFullContentProvider.set(Language.ENGLISH, new FileInputProvider(link, dumpHtmlToFile(content.html())));
+        guide.summary.set(content.select("div#preamble").text());
+        guide.htmlFullContentProvider.set(new FileInputProvider(link, dumpHtmlToFile(content.html())));
 
-        Log.debugf( "Parsed guide: %s", guide.url );
+        Log.debugf("Parsed guide: %s", guide.url);
         return extensionIndex;
     }
 
