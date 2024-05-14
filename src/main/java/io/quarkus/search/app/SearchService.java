@@ -63,6 +63,7 @@ public class SearchService {
     public SearchResult<GuideSearchHit> search(@RestQuery @DefaultValue(QuarkusVersions.LATEST) String version,
             @RestQuery List<String> categories,
             @RestQuery String q,
+            @RestQuery String origin,
             @RestQuery @DefaultValue("en") Language language,
             @RestQuery @DefaultValue("highlighted") String highlightCssClass,
             @RestQuery @DefaultValue("0") @Min(0) int page,
@@ -83,6 +84,9 @@ public class SearchService {
 
                     if (categories != null && !categories.isEmpty()) {
                         root.add(f.terms().field("categories").matchingAny(categories));
+                    }
+                    if (origin != null && !origin.isEmpty()) {
+                        root.add(f.match().field("origin").matching(origin));
                     }
 
                     if (q != null && !q.isBlank()) {
